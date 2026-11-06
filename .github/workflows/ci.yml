@@ -1,45 +1,53 @@
-name: Laravel CI Pipeline
+name: Laravel CI/CD Release Pipeline
 
 on:
   push:
-    branches: [main]
+    branches: [ "main" ]
   pull_request:
-    branches: [main]
-
-permissions:
-  contents: read
+    branches: [ "main" ]
 
 jobs:
-  laravel-tests:
+  build-test-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
-      - name: Obtener codigo
-        uses: actions/checkout@v4
+    - name: Checkout repositorio
+      uses: actions/checkout@v4
 
-      - name: Configurar PHP
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.2'
-          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, fileinfo
-          coverage: none
+    - name: Configurar entorno PHP 8.2
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: '8.2'
+        extensions: mbstring, pdo_sqlite, sqlite3, bcmath, fileinfo
 
-      - name: Validar Composer
-        run: composer validate
+    - name: Validar archivo composer.json
+      run: composer validate --no-check-publish
 
-      - name: Instalar dependencias
-        run: composer install --prefer-dist --no-interaction --no-progress
+    - name: Instalar dependencias (Dev para pruebas)
+      run: composer install --prefer-dist --no-interaction
 
-      - name: Preparar entorno Laravel
-        run: |
-          cp .env.example .env
-          php artisan key:generate
-          php artisan config:clear
+    - name: Preparar entorno de pruebas
+      run: |
+        cp .env.example .env
+        php artisan key:generate
 
-      - name: Ejecutar pruebas automatizadas
-        env:
-          APP_ENV: testing
-          DB_CONNECTION: sqlite
-          DB_DATABASE: ':memory:'
-        run: php artisan test
+    - name: Ejecutar pruebas automatizadas
+      run: php artisan test
+
+    - name: Optimizar e instalar dependencias de producción
+      run: composer install --no-dev --optimize-autoloader --no-interaction
+
+    - name: Generar artefacto de liberacion
+      run: |
+        tar --exclude='.git' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='storage/logs/*' \
+            -czf laravel-release.tar.gz .
+
+    - name: Publicar artefacto
+      uses: actions/upload-artifact@v4
+      with:
+        name: laravel-release
+        path: laravel-release.tar.gz
+        retention-days: 7
