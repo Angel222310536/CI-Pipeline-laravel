@@ -23,20 +23,21 @@ jobs:
     - name: Validar archivo composer.json
       run: composer validate --no-check-publish
 
-    - name: Instalar dependencias del proyecto
+    - name: Instalar dependencias
       run: composer install --prefer-dist --no-interaction
 
-    - name: Preparar entorno de pruebas
+    - name: Configurar entorno de base de datos SQLite para pruebas
       run: |
         cp .env.example .env
         php artisan key:generate
+        echo "DB_CONNECTION=sqlite" >> .env
+        echo "DB_DATABASE=:memory:" >> .env
 
     - name: Ejecutar pruebas automatizadas
       run: php artisan test
 
     - name: Generar artefacto de liberacion
-      run: |
-        tar -czf laravel-release.tar.gz --exclude='.git' --exclude='.env' --exclude='node_modules' --exclude='storage/logs/*' .
+      run: tar -czf laravel-release.tar.gz --exclude='.git' --exclude='.env' --exclude='node_modules' --exclude='storage/logs/*' .
 
     - name: Publicar artefacto
       uses: actions/upload-artifact@v4
