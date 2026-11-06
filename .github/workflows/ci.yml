@@ -37,7 +37,14 @@ jobs:
       run: php artisan test
 
     - name: Generar artefacto de liberacion
-      run: tar -czf laravel-release.tar.gz --exclude='.git' --exclude='.env' --exclude='node_modules' --exclude='storage/logs/*' .
+      run: |
+        tar --exclude='.git' \
+            --exclude='.env' \
+            --exclude='node_modules' \
+            --exclude='storage/logs/*' \
+            --exclude='laravel-release.tar.gz' \
+            -czf ../laravel-release.tar.gz .
+        mv ../laravel-release.tar.gz .
 
     - name: Publicar artefacto
       uses: actions/upload-artifact@v4
