@@ -23,7 +23,7 @@ jobs:
     - name: Validar archivo composer.json
       run: composer validate --no-check-publish
 
-    - name: Instalar dependencias (Dev para pruebas)
+    - name: Instalar dependencias del proyecto
       run: composer install --prefer-dist --no-interaction
 
     - name: Preparar entorno de pruebas
@@ -33,9 +33,6 @@ jobs:
 
     - name: Ejecutar pruebas automatizadas
       run: php artisan test
-
-    - name: Optimizar e instalar dependencias de producción
-      run: composer install --no-dev --optimize-autoloader --no-interaction
 
     - name: Generar artefacto de liberacion
       run: |
