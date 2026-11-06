@@ -38,7 +38,8 @@ jobs:
       run: composer install --no-dev --optimize-autoloader --no-interaction
 
     - name: Generar artefacto de liberacion
-      run: "tar --exclude='.git' --exclude='.env' --exclude='node_modules' --exclude='storage/logs/*' -czf laravel-release.tar.gz ."
+      run: |
+        tar -czf laravel-release.tar.gz --exclude='.git' --exclude='.env' --exclude='node_modules' --exclude='storage/logs/*' .
 
     - name: Publicar artefacto
       uses: actions/upload-artifact@v4
