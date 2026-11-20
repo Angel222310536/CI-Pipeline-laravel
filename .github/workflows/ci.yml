@@ -1,54 +1,87 @@
+
 name: Laravel CI/CD Release Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   build-test-and-release:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repositorio
-      uses: actions/checkout@v4
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
 
-    - name: Configurar entorno PHP 8.2
-      uses: shivammathur/setup-php@v2
-      with:
-        php-version: '8.2'
-        extensions: mbstring, pdo_sqlite, sqlite3, bcmath, fileinfo
+      - name: Configurar entorno PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.2"
+          extensions: mbstring, pdo_sqlite, sqlite3, bcmath, fileinfo
 
-    - name: Validar archivo composer.json
-      run: composer validate --no-check-publish
+      - name: Validar archivo composer.json
+        run: composer validate --no-check-publish
 
-    - name: Instalar dependencias
-      run: composer install --prefer-dist --no-interaction
+      - name: Instalar dependencias
+        run: composer install --prefer-dist --no-interaction
 
-    - name: Configurar entorno de base de datos SQLite para pruebas
-      run: |
-        cp .env.example .env
-        php artisan key:generate
-        echo "DB_CONNECTION=sqlite" >> .env
-        echo "DB_DATABASE=:memory:" >> .env
+      - name: Configurar entorno de base de datos SQLite para pruebas
+        run: |
+          cp .env.example .env
+          php artisan key:generate
 
-    - name: Ejecutar pruebas automatizadas
-      run: php artisan test
+          echo "DB_CONNECTION=sqlite" >> .env
+          echo "DB_DATABASE=:memory:" >> .env
+          echo "SESSION_DRIVER=file" >> .env
 
-    - name: Generar artefacto de liberacion
-      run: |
-        tar --exclude='.git' \
-            --exclude='.env' \
-            --exclude='node_modules' \
-            --exclude='storage/logs/*' \
-            --exclude='laravel-release.tar.gz' \
-            -czf ../laravel-release.tar.gz .
-        mv ../laravel-release.tar.gz .
+          php artisan config:clear
 
-    - name: Publicar artefacto
-      uses: actions/upload-artifact@v4
-      with:
-        name: laravel-release
-        path: laravel-release.tar.gz
-        retention-days: 7
+      - name: Ejecutar pruebas automatizadas
+        run: php artisan test
+
+      - name: Iniciar servidor Laravel para monitoreo
+        run: |
+          php artisan serve --host=127.0.0.1 --port=8000 > /tmp/laravel-server.log 2>&1 &
+          echo $! > /tmp/laravel-server.pid
+
+      - name: Verificar disponibilidad de Laravel
+        run: |
+          for i in {1..15}; do
+            if curl --silent --show-error --fail \
+              http://127.0.0.1:8000/health \
+              -o /tmp/health-response.json; then
+
+              cat /tmp/health-response.json
+              echo ""
+
+              if grep -q '"status":"ok"' /tmp/health-response.json; then
+                echo "Monitoreo exitoso: Laravel está disponible."
+                exit 0
+              fi
+            fi
+
+            sleep 2
+          done
+
+          echo "Error: Laravel no respondió correctamente."
+          cat /tmp/laravel-server.log
+          exit 1
+
+      - name: Generar artefacto de liberacion
+        run: |
+          tar --exclude='.git' \
+              --exclude='.env' \
+              --exclude='node_modules' \
+              --exclude='storage/logs/*' \
+              --exclude='laravel-release.tar.gz' \
+              -czf ../laravel-release.tar.gz .
+          mv ../laravel-release.tar.gz .
+
+      - name: Publicar artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: laravel-release
+          path: laravel-release.tar.gz
+          retention-days: 7
